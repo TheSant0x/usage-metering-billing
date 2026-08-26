@@ -54,6 +54,10 @@ class UsageEvent(Base):
     tenant_id = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     type = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
+    input_tokens = Column(Integer, nullable=True, default=0)
+    cached_input_tokens = Column(Integer, nullable=True, default=0)
+    output_tokens = Column(Integer, nullable=True, default=0)
+    reasoning_tokens = Column(Integer, nullable=True, default=0)
     idempotency_key = Column(String, nullable=False)
     created_at = Column(DateTime, default=dt.datetime.utcnow, nullable=False)
 
