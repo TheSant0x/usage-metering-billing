@@ -3,6 +3,7 @@ from enum import Enum
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.database import Base
 
@@ -59,7 +60,7 @@ class UsageEvent(Base):
     output_tokens = Column(Integer, nullable=True, default=0)
     reasoning_tokens = Column(Integer, nullable=True, default=0)
     idempotency_key = Column(String, nullable=False)
-    created_at = Column(DateTime, default=dt.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_usage_event_idempotency_key"),
@@ -84,4 +85,4 @@ class ProcessedStripeEvent(Base):
     id = Column(Integer, primary_key=True, index=True)
     stripe_event_id = Column(String, unique=True, nullable=False)
     type = Column(String, nullable=False)
-    processed_at = Column(DateTime, default=dt.datetime.utcnow, nullable=False)
+    processed_at = Column(DateTime, default=func.now(), nullable=False)

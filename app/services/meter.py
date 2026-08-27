@@ -27,9 +27,13 @@ def _month_bounds(now: dt.datetime) -> tuple[dt.datetime, dt.datetime]:
     return start, end
 
 
+def _utc_now() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc)
+
+
 def get_monthly_usage(db: Session, tenant_id: int, usage_type: str, now: dt.datetime | None = None) -> int:
     if now is None:
-        now = dt.datetime.utcnow()
+        now = _utc_now()
     start, end = _month_bounds(now)
     total = (
         db.query(func.coalesce(func.sum(UsageEvent.quantity), 0))
@@ -48,7 +52,7 @@ def get_monthly_token_breakdown(
     db: Session, tenant_id: int, now: dt.datetime | None = None
 ) -> dict[str, int]:
     if now is None:
-        now = dt.datetime.utcnow()
+        now = _utc_now()
     start, end = _month_bounds(now)
     row = (
         db.query(
@@ -108,6 +112,8 @@ def record_usage(
     now: dt.datetime | None = None,
 ) -> UsageEvent:
     """Record a usage event idempotently. Raises HTTPException on duplicate creation."""
+    if now is None:
+        now = _utc_now()
     existing = (
         db.query(UsageEvent)
         .filter(UsageEvent.idempotency_key == idempotency_key)
@@ -147,7 +153,7 @@ def get_usage_summary(db: Session, tenant_id: int, now: dt.datetime | None = Non
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     if now is None:
-        now = dt.datetime.utcnow()
+        now = _utc_now()
     start, end = _month_bounds(now)
 
     plan = tenant.plan

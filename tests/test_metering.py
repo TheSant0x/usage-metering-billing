@@ -29,8 +29,8 @@ def test_idempotency_creates_exactly_one_event(client: TestClient, free_tenant):
     db = TestingSessionLocal()
     events = db.query(UsageEvent).filter(UsageEvent.tenant_id == tenant_id).all()
     db.close()
-    # one API call event + one token event (zero tokens) = 2 rows, both sharing the key prefix
-    assert len(events) == 2
+    # Only the API-call event is created; zero-token usage is skipped.
+    assert len(events) == 1
 
 
 def test_quota_boundary_free_plan(client: TestClient, free_tenant):

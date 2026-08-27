@@ -17,8 +17,7 @@ class TenantOut(BaseModel):
     stripe_customer_id: Optional[str]
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class GenerateRequest(BaseModel):
