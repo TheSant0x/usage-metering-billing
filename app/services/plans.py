@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import Plan
+
+settings = get_settings()
 
 
 def seed_plans(db: Session) -> None:
@@ -19,7 +22,7 @@ def seed_plans(db: Session) -> None:
             api_calls_limit=10_000,
             ai_tokens_limit=1_000_000,
             price_cents=999,
-            stripe_price_id=None,
+            stripe_price_id=settings.stripe_price_id_pro or None,
         ),
     ]
     for plan in plans:

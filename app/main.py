@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import engine, Base
-from app.routers import tenants, generate, usage
+from app.routers import tenants, generate, usage, checkout, webhooks
 
 Base.metadata.create_all(bind=engine)
 
@@ -13,6 +13,8 @@ app = FastAPI(
 app.include_router(tenants.router)
 app.include_router(generate.router)
 app.include_router(usage.router)
+app.include_router(checkout.router)
+app.include_router(webhooks.router)
 
 
 @app.get("/health")
