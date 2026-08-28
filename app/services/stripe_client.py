@@ -9,7 +9,7 @@ from app.services.plans import get_plan_by_name
 settings = get_settings()
 
 
-def _client() -> stripe_lib.Stripe:
+def _client():
     if not settings.stripe_secret_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
