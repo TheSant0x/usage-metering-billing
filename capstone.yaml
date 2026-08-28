@@ -1,0 +1,36 @@
+name: FlyRank Usage Metering & Billing Engine
+version: 1.0.0
+
+run: |
+  source .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+seed: |
+  source .venv/bin/activate && python scripts/seed.py
+
+test: |
+  source .venv/bin/activate && pytest
+
+base_url: http://localhost:8000
+
+endpoints:
+  - method: POST
+    path: /tenants
+    description: Create a tenant (defaults to Free plan)
+  - method: GET
+    path: /tenants/{tenant_id}
+    description: Read tenant details
+  - method: POST
+    path: /generate
+    description: Dummy billable endpoint; accepts Idempotency-Key header
+  - method: GET
+    path: /usage/{tenant_id}
+    description: Monthly usage, limits, and cost rollup
+  - method: POST
+    path: /checkout
+    description: Start Stripe Checkout for Pro upgrade
+  - method: POST
+    path: /webhooks/stripe
+    description: Stripe webhook handler
+  - method: GET
+    path: /docs
+    description: Swagger UI
