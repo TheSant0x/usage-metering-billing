@@ -84,6 +84,12 @@ def test_valid_webhook_processed_once_and_upgrades_plan(client: TestClient, free
     assert resp2.status_code == 200
     assert resp2.json()["status"] == "already processed"
 
+    usage = client.get(f"/usage/{tenant_id}").json()
+    print("USAGE AFTER UPGRADE:", usage)
+    assert usage["plan_name"] == "pro"
+    assert usage["items"][0]["limit"] == 10_000
+    assert usage["items"][1]["limit"] == 1_000_000
+
     db = TestingSessionLocal()
     processed = db.query(ProcessedStripeEvent).filter(
         ProcessedStripeEvent.stripe_event_id == "evt_upgrade_1"
