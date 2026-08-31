@@ -123,7 +123,13 @@ def record_usage(
     if existing:
         return existing
 
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    # Lock the tenant row to serialize quota checks and usage recording.
+    tenant = (
+        db.query(Tenant)
+        .filter(Tenant.id == tenant_id)
+        .with_for_update()
+        .first()
+    )
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
