@@ -30,6 +30,11 @@ def test_full_crud_cycle(client: TestClient):
     assert resp.status_code == 200
     assert resp.json()["name"] == "CRUD"
 
+    # List
+    resp = client.get("/tenants")
+    assert resp.status_code == 200
+    assert any(t["id"] == tenant_id for t in resp.json())
+
     # Usage starts empty
     resp = client.get(f"/usage/{tenant_id}")
     assert resp.status_code == 200

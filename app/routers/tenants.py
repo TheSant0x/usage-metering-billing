@@ -36,6 +36,12 @@ def read_tenant(tenant_id: int, db: Session = Depends(get_db)):
     return _tenant_out(tenant)
 
 
+@router.get("", response_model=list[TenantOut])
+def list_tenants(db: Session = Depends(get_db)):
+    tenants = db.query(Tenant).all()
+    return [_tenant_out(t) for t in tenants]
+
+
 def _tenant_out(tenant: Tenant) -> TenantOut:
     return TenantOut(
         id=tenant.id,
