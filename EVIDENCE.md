@@ -84,10 +84,11 @@ A request with a bad `Stripe-Signature` returns `400 Bad Request` and leaves ten
 ## DATA MODEL, TESTS & DOCUMENTATION
 
 - Database schema includes `tenants`, `plans`, `usage_events`, `subscriptions`, and `processed_stripe_events`.
-- All 13 tests pass:
+- All 16 tests pass (1 skipped on SQLite because it does not support row-level `FOR UPDATE`):
 
 ```
-======================== 13 passed in 69.03s (0:01:09) =========================
+s................                                                        [100%]
+16 passed, 1 skipped in 6.23s
 ```
 
 - Required files present: `README.md`, `capstone.yaml`, `BUILDLOG.md`, `EVIDENCE.md`, `.env.example`.
@@ -99,24 +100,34 @@ $ source .venv/bin/activate && pytest
 ============================= test session starts ==============================
 platform linux -- Python 3.13.12, pytest-9.0.2, pluggy-1.6.0 -- /home/sant0x/FlyRank/Capstone Project/.venv/bin/python
 rootdir: /home/sant0x/FlyRank/Capstone Project
-collected 13 items
+collected 17 items
 
-tests/test_docs.py::test_swagger_ui_reachable PASSED                     [  7%]
-tests/test_docs.py::test_openapi_schema_reachable PASSED                 [ 15%]
+tests/test_concurrency.py::test_concurrent_requests_honor_quota SKIPPED (SQLite does not support row-level FOR UPDATE locking) [  5%]
+tests/test_docs.py::test_swagger_ui_reachable PASSED                     [ 11%]
+tests/test_docs.py::test_openapi_schema_reachable PASSED                 [ 17%]
 tests/test_docs.py::test_full_crud_cycle PASSED                          [ 23%]
-tests/test_jobs.py::test_usage_alert_logs_near_quota PASSED              [ 30%]
-tests/test_metering.py::test_idempotency_creates_exactly_one_event PASSED [ 38%]
-tests/test_metering.py::test_quota_boundary_free_plan PASSED             [ 46%]
-tests/test_metering.py::test_payment_required_for_past_due PASSED        [ 53%]
-tests/test_pricing.py::test_cached_input_is_cheaper_than_input PASSED    [ 61%]
-tests/test_pricing.py::test_reasoning_tokens_count_as_output PASSED      [ 69%]
-tests/test_pricing.py::test_api_call_cost_is_linear PASSED               [ 76%]
-tests/test_pricing.py::test_mixed_token_cost PASSED                      [ 84%]
-tests/test_webhooks.py::test_forged_webhook_returns_400 PASSED           [ 92%]
+tests/test_jobs.py::test_usage_alert_logs_near_quota PASSED              [ 29%]
+tests/test_metering.py::test_idempotency_creates_exactly_one_event PASSED [ 35%]
+tests/test_metering.py::test_quota_boundary_free_plan PASSED             [ 41%]
+tests/test_metering.py::test_invalid_input_returns_422 PASSED            [ 47%]
+tests/test_metering.py::test_payment_required_for_past_due PASSED        [ 52%]
+tests/test_pricing.py::test_cached_input_is_cheaper_than_input PASSED    [ 58%]
+tests/test_pricing.py::test_reasoning_tokens_count_as_output PASSED      [ 64%]
+tests/test_pricing.py::test_api_call_cost_is_linear PASSED               [ 70%]
+tests/test_pricing.py::test_millicents_to_cents_rounds_correctly PASSED  [ 76%]
+tests/test_pricing.py::test_millicents_improves_rounding_vs_cents_truncation PASSED [ 82%]
+tests/test_pricing.py::test_mixed_token_cost PASSED                      [ 88%]
+tests/test_webhooks.py::test_forged_webhook_returns_400 PASSED           [ 94%]
 tests/test_webhooks.py::test_valid_webhook_processed_once_and_upgrades_plan PASSED [100%]
 
-======================== 13 passed in 69.03s (0:01:09) =========================
+======================== 16 passed, 1 skipped in 6.23s =========================
 ```
+
+## CONCURRENCY HARDENING
+
+**Test**: `tests/test_concurrency.py::test_concurrent_requests_honor_quota` (skipped on SQLite)
+
+`record_usage()` now locks the tenant row with `SELECT FOR UPDATE` before checking quotas and inserting the usage event. On PostgreSQL this serializes concurrent requests so that two simultaneous calls at `used=999` cannot both succeed and overshoot the limit.
 
 ## Background job
 
@@ -134,4 +145,4 @@ tests/test_docs.py::test_openapi_schema_reachable PASSED                 [ 66%]
 tests/test_docs.py::test_full_crud_cycle PASSED                          [100%]
 ```
 
-`GET /docs` returns Swagger UI and the OpenAPI schema includes `/tenants`, `/generate`, `/usage/{tenant_id}`, `/checkout`, and `/webhooks/stripe`.
+`GET /docs` returns Swagger UI and the OpenAPI schema includes `/tenants`, `/tenants/{tenant_id}`, `/generate`, `/usage/{tenant_id}`, `/checkout`, and `/webhooks/stripe`.
