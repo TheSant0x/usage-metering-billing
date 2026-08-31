@@ -19,6 +19,9 @@ endpoints:
   - method: GET
     path: /tenants/{tenant_id}
     description: Read tenant details
+  - method: GET
+    path: /tenants
+    description: List all tenants
   - method: POST
     path: /generate
     description: Dummy billable endpoint; accepts Idempotency-Key header

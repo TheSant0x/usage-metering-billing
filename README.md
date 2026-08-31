@@ -12,6 +12,8 @@ A production-oriented backend service that answers the three questions every Saa
 
 Built with **FastAPI**, **SQLAlchemy**, and **Stripe test mode**, this project demonstrates exactly-once usage metering, honest quota enforcement, integer money math for AI-token pricing, and cryptographically verified Stripe webhooks.
 
+> **Why this matters:** Billing systems fail quietly and cost real money. This project focuses on the correctness guarantees — idempotency, honest boundaries, and verified webhooks — that separate prototype billing from production billing.
+
 ---
 
 ## Table of Contents
@@ -138,6 +140,7 @@ python scripts/seed.py
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/tenants` | Create a tenant on the Free plan |
+| `GET` | `/tenants` | List all tenants |
 | `GET` | `/tenants/{tenant_id}` | Read tenant details |
 | `POST` | `/generate` | Dummy billable endpoint; requires `Idempotency-Key` header |
 | `GET` | `/usage/{tenant_id}` | Monthly usage, limits, and cost rollup |
