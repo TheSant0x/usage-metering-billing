@@ -18,12 +18,15 @@ This project was built with the help of AI coding assistants (Claude / pi). This
 ## Hand-written / hand-verified parts
 
 - Quota boundary logic (`used + requested > limit`) and the 429/402 status-code mapping.
-- The decision to use `cents per 1,000,000 tokens` as the integer rate base.
+- The decision to use `cents per 1,000,000 tokens` as the integer rate base, later upgraded to millicents for sub-cent precision.
 - The seed-script and probe-script outputs captured in `EVIDENCE.md`.
 - Git commit date randomization and timezone handling.
+- Post-review hardening: `SELECT FOR UPDATE` tenant locking, `IntegrityError` race fallbacks, Pydantic validators, and test speed-ups.
 
 ## Lessons learned
 
 - Always keep the token breakdown, even if the quota is on total tokens. Category-specific pricing is impossible without it.
 - Webhook deduplication must be committed before handling the event to stay safe under retries.
 - Test the unhappy paths first: forged signatures, duplicate events, and exact quota boundaries are where billing systems fail.
+- A test suite that takes 70 seconds discourages running it; seeding DB rows directly for bulk scenarios keeps feedback fast.
+- `SELECT FOR UPDATE` protects quota checks under concurrency, but only on databases that support row-level locking (not SQLite).
