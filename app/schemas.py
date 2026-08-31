@@ -47,6 +47,7 @@ class UsageItem(BaseModel):
     type: str
     used: int
     limit: int
+    cost_millicents: int
     cost_cents: int
 
 
@@ -56,6 +57,7 @@ class UsageOut(BaseModel):
     period_start: dt.datetime
     period_end: dt.datetime
     items: list[UsageItem]
+    total_cost_millicents: int
     total_cost_cents: int
 
 

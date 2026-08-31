@@ -5,7 +5,11 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
 from app.models import UsageEvent, Tenant, TenantStatus, UsageType
-from app.services.pricing import calculate_token_cost_cents, calculate_api_call_cost_cents
+from app.services.pricing import (
+    calculate_token_cost_millicents,
+    calculate_api_call_cost_millicents,
+    millicents_to_cents,
+)
 
 
 class QuotaResult:
@@ -180,13 +184,14 @@ def get_usage_summary(db: Session, tenant_id: int, now: dt.datetime | None = Non
     ai_used = get_monthly_usage(db, tenant_id, UsageType.AI_TOKEN, now)
     token_breakdown = get_monthly_token_breakdown(db, tenant_id, now)
 
-    api_cost = calculate_api_call_cost_cents(api_used)
-    ai_cost = calculate_token_cost_cents(
+    api_cost_millicents = calculate_api_call_cost_millicents(api_used)
+    ai_cost_millicents = calculate_token_cost_millicents(
         token_breakdown["input"],
         token_breakdown["cached_input"],
         token_breakdown["output"],
         token_breakdown["reasoning"],
     )
+    total_millicents = api_cost_millicents + ai_cost_millicents
 
     return {
         "tenant_id": tenant_id,
@@ -194,8 +199,21 @@ def get_usage_summary(db: Session, tenant_id: int, now: dt.datetime | None = Non
         "period_start": start,
         "period_end": end,
         "items": [
-            {"type": UsageType.API_CALL, "used": api_used, "limit": plan.api_calls_limit, "cost_cents": api_cost},
-            {"type": UsageType.AI_TOKEN, "used": ai_used, "limit": plan.ai_tokens_limit, "cost_cents": ai_cost},
+            {
+                "type": UsageType.API_CALL,
+                "used": api_used,
+                "limit": plan.api_calls_limit,
+                "cost_millicents": api_cost_millicents,
+                "cost_cents": millicents_to_cents(api_cost_millicents),
+            },
+            {
+                "type": UsageType.AI_TOKEN,
+                "used": ai_used,
+                "limit": plan.ai_tokens_limit,
+                "cost_millicents": ai_cost_millicents,
+                "cost_cents": millicents_to_cents(ai_cost_millicents),
+            },
         ],
-        "total_cost_cents": api_cost + ai_cost,
+        "total_cost_millicents": total_millicents,
+        "total_cost_cents": millicents_to_cents(total_millicents),
     }

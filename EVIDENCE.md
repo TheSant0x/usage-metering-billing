@@ -57,11 +57,11 @@ PASS: cost math is exact
 ```
 
 Breakdown:
-- 100 API calls × 1¢ = 100¢
-- 20,000 input tokens × $0.50/1M = 1¢
-- 40,000 cached input tokens × $0.25/1M = 1¢
-- 20,000 output + 20,000 reasoning tokens × $1.50/1M = 6¢
-- Total = 108¢
+- 100 API calls × 1¢ = 100,000 millicents
+- 20,000 input tokens × $0.50/1M = 1,000 millicents
+- 40,000 cached input tokens × $0.25/1M = 1,000 millicents
+- 20,000 output + 20,000 reasoning tokens × $1.50/1M = 6,000 millicents
+- Total = 108,000 millicents = 108¢ (rounded)
 
 ## STRIPE INTEGRATION — checkout + webhooks
 

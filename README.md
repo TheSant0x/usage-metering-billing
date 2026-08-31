@@ -67,7 +67,7 @@ Built with **FastAPI**, **SQLAlchemy**, and **Stripe test mode**, this project d
 |------------|----------------|
 | **Idempotent metering** | `Idempotency-Key` header + unique DB constraint + `IntegrityError` fallback |
 | **Quota enforcement** | `used + requested > limit` check before any write; returns `429` or `402` |
-| **AI token pricing** | Cached input cheaper; reasoning tokens billed as output; integer cents |
+| **AI token pricing** | Cached input cheaper; reasoning tokens billed as output; integer millicents internally, cents displayed |
 | **Stripe integration** | Test-mode Checkout + signature-verified, deduplicated webhooks |
 | **Subscription sync** | `customer.subscription.updated/deleted` flips tenant plan Free ↔ Pro |
 | **Background jobs** | In-process usage-alert scheduler (production: swap for Celery/RQ) |
@@ -223,7 +223,7 @@ See [`EVIDENCE.md`](EVIDENCE.md) for pasted transcripts.
 
 ## Design Decisions
 
-- **Integer money**: all stored prices and computed costs use integer cents. Token rates are expressed as cents per 1,000,000 tokens to avoid floating-point arithmetic.
+- **Integer money**: plan prices are stored as integer cents; usage costs are computed in integer millicents and rounded to cents for display. Token rates are expressed as millicents per 1,000,000 tokens to avoid floating-point arithmetic.
 - **Idempotency**: a unique constraint on `usage_events.idempotency_key` is the final guard against double-recording under concurrent retries.
 - **Webhook safety**: events are persisted to `processed_stripe_events` before handling so replays are always idempotent, even if the handler crashes mid-flight.
 - **Layered architecture**: routers validate and serialize; services contain business logic; models define the schema. Swapping SQLite for PostgreSQL requires only a connection-string change.
@@ -233,7 +233,7 @@ See [`EVIDENCE.md`](EVIDENCE.md) for pasted transcripts.
 ## Limitations & Roadmap
 
 - **SQLite** is used for portability; production should use PostgreSQL.
-- **Token cost precision**: sub-cent remainders from `cents-per-1M` rates are truncated. For higher precision, use millicents internally.
+- **Token cost precision**: costs are tracked in millicents and rounded to cents for display. For single-token precision, use microcents or smaller units.
 - **No proration, invoicing, or overage billing** — these are deliberate stretch goals.
 - **In-process scheduler** is fine for demos; replace with Celery/RQ and a persistent broker in production.
 - **No authentication/authorization** in this scope; every endpoint trusts the `tenant_id` supplied by the caller.

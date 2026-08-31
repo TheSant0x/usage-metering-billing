@@ -110,9 +110,11 @@ def probe_5_pricing():
     print(f"Generate: {r.status_code} -> {r.json()}")
     usage = client.get(f"/usage/{tid}").json()
     print(f"Usage: {usage}")
-    # Expected: API = 100 cents
+    # Expected: API = 100 cents = 100,000 millicents
     # tokens: input 20k*50/1M=1, cached 40k*25/1M=1, output+reasoning 40k*150/1M=6
+    # total = 108 cents = 108,000 millicents
     assert usage["total_cost_cents"] == 108
+    assert usage["total_cost_millicents"] == 108_000
     print("PASS: cost math is exact")
 
 
