@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.models import UsageEvent
+from app.models import UsageEvent, UsageType
 from tests.conftest import TestingSessionLocal
 
 
@@ -35,15 +35,18 @@ def test_idempotency_creates_exactly_one_event(client: TestClient, free_tenant):
 
 def test_quota_boundary_free_plan(client: TestClient, free_tenant):
     tenant_id = free_tenant["id"]
-    # Free plan: 1,000 API calls per month.
-    # Drive tenant to exactly 999 calls with individual requests.
+    db = TestingSessionLocal()
+    # Seed 999 API-call events directly to avoid 999 slow HTTP requests.
     for i in range(999):
-        resp = client.post(
-            "/generate",
-            json={"tenant_id": tenant_id, "api_calls": 1},
-            headers={"Idempotency-Key": f"boundary-{i}"},
+        event = UsageEvent(
+            tenant_id=tenant_id,
+            type=UsageType.API_CALL,
+            quantity=1,
+            idempotency_key=f"boundary-seed-{i}",
         )
-        assert resp.status_code == 200, f"failed at call {i}: {resp.text}"
+        db.add(event)
+    db.commit()
+    db.close()
 
     # The 1,000th call should still succeed (boundary inclusive).
     resp = client.post(
