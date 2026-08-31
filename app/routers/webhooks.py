@@ -1,5 +1,6 @@
 import stripe as stripe_lib
 from fastapi import APIRouter, Request, HTTPException, status, Depends
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -47,7 +48,12 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         type=event["type"],
     )
     db.add(processed)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Another worker processed the same event concurrently.
+        return {"status": "already processed"}
 
     data = event.get("data", {}).get("object", {})
 
