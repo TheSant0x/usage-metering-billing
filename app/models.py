@@ -1,4 +1,3 @@
-import datetime as dt
 from enum import Enum
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Index

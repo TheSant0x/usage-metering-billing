@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Tenant, Plan
+from app.models import Tenant, TenantStatus
 from app.schemas import TenantCreate, TenantOut
 from app.services.plans import seed_plans, get_plan_by_name
 
@@ -20,7 +20,7 @@ def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
         name=payload.name,
         email=payload.email,
         plan_id=free_plan.id,
-        status="active",
+        status=TenantStatus.ACTIVE,
     )
     db.add(tenant)
     db.commit()

@@ -2,9 +2,6 @@ import hmac
 import hashlib
 import json
 import time
-from unittest.mock import patch
-
-import stripe
 from fastapi.testclient import TestClient
 
 from app.models import Tenant, Subscription, ProcessedStripeEvent

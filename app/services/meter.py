@@ -1,9 +1,10 @@
 import datetime as dt
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
-from app.models import UsageEvent, Tenant, Plan, TenantStatus, UsageType
+from app.models import UsageEvent, Tenant, TenantStatus, UsageType
 from app.services.pricing import calculate_token_cost_cents, calculate_api_call_cost_cents
 
 
@@ -142,7 +143,19 @@ def record_usage(
         idempotency_key=idempotency_key,
     )
     db.add(event)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Race: another request committed the same idempotency key first.
+        existing = (
+            db.query(UsageEvent)
+            .filter(UsageEvent.idempotency_key == idempotency_key)
+            .first()
+        )
+        if existing:
+            return existing
+        raise
     db.refresh(event)
     return event
 

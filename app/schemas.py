@@ -1,6 +1,6 @@
 import datetime as dt
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class TenantCreate(BaseModel):
@@ -21,12 +21,19 @@ class TenantOut(BaseModel):
 
 
 class GenerateRequest(BaseModel):
-    tenant_id: int
-    api_calls: int = 1
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
+    tenant_id: int = Field(..., ge=1)
+    api_calls: int = Field(default=1, ge=0)
+    input_tokens: int = Field(default=0, ge=0)
+    cached_input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
+    reasoning_tokens: int = Field(default=0, ge=0)
+
+    @field_validator("tenant_id")
+    @classmethod
+    def tenant_id_must_be_positive(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("tenant_id must be positive")
+        return v
 
 
 class GenerateResponse(BaseModel):

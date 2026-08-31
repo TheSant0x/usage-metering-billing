@@ -1,163 +1,245 @@
 # FlyRank Capstone: Usage Metering & Billing Engine
 
-A small, correct backend service that meters usage, enforces plan quotas, calculates AI-token costs with real-world pricing rules, and syncs subscription state with Stripe in test mode.
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111%2B-009688)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## What it does
+A production-oriented backend service that answers the three questions every SaaS must get right:
 
-Every SaaS must answer three questions:
+1. **How much has this customer used?**
+2. **What does it cost?**
+3. **Have they hit their plan limits?**
 
-1. How much has this customer used this month?
-2. What does it cost?
-3. Have they reached their plan limits?
+Built with **FastAPI**, **SQLAlchemy**, and **Stripe test mode**, this project demonstrates exactly-once usage metering, honest quota enforcement, integer money math for AI-token pricing, and cryptographically verified Stripe webhooks.
 
-This service answers all three with exactly-once metering, honest quota enforcement, integer money math, and verified Stripe webhooks.
+---
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [API Reference](#api-reference)
+- [Running Tests](#running-tests)
+- [Acceptance Probes](#acceptance-probes)
+- [Project Structure](#project-structure)
+- [Design Decisions](#design-decisions)
+- [Limitations & Roadmap](#limitations--roadmap)
+- [License](#license)
+
+---
 
 ## Architecture
 
 ```text
-┌─────────┐     POST /generate (Idempotency-Key)     ┌──────────────┐
-│  Client │ ───────────────────────────────────────► │   FastAPI    │
-└─────────┘                                          └──────┬───────┘
-                                                            │
-                            ┌───────────────────────────────┼───────────────────────────────┐
-                            │                               │                               │
-                            ▼                               ▼                               ▼
-                    ┌───────────────┐              ┌───────────────┐              ┌───────────────┐
-                    │  Tenant CRUD  │              │ MeterService  │              │ Stripe webhook│
-                    │   /tenants    │              │  /generate    │              │   /webhooks   │
-                    └───────────────┘              └───────┬───────┘              └───────┬───────┘
-                                                           │                              │
-                              ┌────────────────────────────┘                              │
-                              │                                                           │
-                              ▼                                                           ▼
-                    ┌─────────────────────┐                                    ┌─────────────────────┐
-                    │  Quota check        │                                    │ Signature verify    │
-                    │  200 / 429 / 402    │                                    │ Deduplicate event   │
-                    └─────────────────────┘                                    │ Update tenant plan  │
-                                                                               └─────────────────────┘
-                                                                                         │
-                              ┌──────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────┐
-                    │   UsageEvent table  │
-                    │  tenants, plans,    │
-                    │  subscriptions,     │
-                    │ processed_events    │
-                    └─────────────────────┘
+                    ┌─────────────────────────────────────────────────────────────┐
+                    │                        FastAPI App                          │
+                    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+     Client ───────►│  │ /tenants    │  │ /generate   │  │ /webhooks/stripe    │  │
+                    │  │ CRUD        │  │ Idempotency │  │ Signature + dedup   │  │
+                    │  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+                    └─────────┼────────────────┼────────────────────┼─────────────┘
+                              │                │                    │
+                              ▼                ▼                    ▼
+                    ┌─────────────────────────────────────────────────────────────┐
+                    │                         Service Layer                         │
+                    │   MeterService          PricingService        StripeService   │
+                    │   - quota check         - integer cents       - checkout      │
+                    │   - idempotent record   - token breakdown     - webhook sync  │
+                    └────────────────────────────┬──────────────────────────────────┘
+                                                 │
+                              ┌──────────────────┼──────────────────┐
+                              │                  │                  │
+                              ▼                  ▼                  ▼
+                    ┌─────────────────┐ ┌───────────────┐ ┌─────────────────────┐
+                    │   tenants       │ │ usage_events  │ │ processed_stripe_   │
+                    │   plans         │ │ subscriptions │ │ events              │
+                    └─────────────────┘ └───────────────┘ └─────────────────────┘
 ```
 
-## Stack
+---
 
-- **Language & framework**: Python 3.11+, FastAPI
-- **Database**: SQLite by default (PostgreSQL-compatible schema via SQLAlchemy)
-- **Payments**: Stripe Python SDK in test mode
+## Features
+
+| Capability | Implementation |
+|------------|----------------|
+| **Idempotent metering** | `Idempotency-Key` header + unique DB constraint + `IntegrityError` fallback |
+| **Quota enforcement** | `used + requested > limit` check before any write; returns `429` or `402` |
+| **AI token pricing** | Cached input cheaper; reasoning tokens billed as output; integer cents |
+| **Stripe integration** | Test-mode Checkout + signature-verified, deduplicated webhooks |
+| **Subscription sync** | `customer.subscription.updated/deleted` flips tenant plan Free ↔ Pro |
+| **Background jobs** | In-process usage-alert scheduler (production: swap for Celery/RQ) |
+| **OpenAPI / Swagger** | `GET /docs` interactive documentation |
+
+---
+
+## Tech Stack
+
+- **Runtime**: Python 3.11+
+- **Web framework**: FastAPI
+- **ORM**: SQLAlchemy 2.0
+- **Database**: SQLite (default), PostgreSQL-ready
+- **Payments**: Stripe Python SDK (test mode only)
+- **Validation**: Pydantic v2
 - **Testing**: pytest + FastAPI TestClient
 
-## Setup
+---
+
+## Quick Start
 
 ```bash
-# 1. Clone / enter the repo
-python -m venv --system-site-packages .venv
+# 1. Clone the repo and create a virtual environment
+git clone <repo-url>
+cd flyrank-capstone-metering-billing
+python -m venv .venv
 source .venv/bin/activate
-pip install stripe==9.7.0          # if system packages already include FastAPI/SQLAlchemy/pytest
-# OR on a clean machine:
-# pip install -r requirements.txt
 
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure environment variables
 cp .env.example .env
-# Edit .env with your Stripe test keys (never commit .env)
-uvicorn app.main:app --reload
-```
+# Edit .env and add your Stripe test keys (never commit .env)
 
-## Configuration
-
-Copy `.env.example` to `.env` and fill in:
-
-```bash
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_PRO=price_...
-```
-
-The app defaults to SQLite at `./flyrank_billing.db`. Set `DATABASE_URL` to a PostgreSQL connection string for production.
-
-## API Endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/tenants` | Create a tenant (Free plan) |
-| GET | `/tenants/{tenant_id}` | Read tenant details |
-| POST | `/generate` | Dummy billable endpoint; accepts `Idempotency-Key` header |
-| GET | `/usage/{tenant_id}` | Monthly usage, limits, and cost |
-| POST | `/checkout` | Create Stripe Checkout session for Pro upgrade |
-| POST | `/webhooks/stripe` | Receive and verify Stripe events |
-| GET | `/docs` | Swagger UI |
-
-## Run & seed
-
-```bash
-# Terminal 1
-source .venv/bin/activate
+# 4. Run the server
 uvicorn app.main:app --reload
 
-# Terminal 2
+# 5. Open Swagger UI
+open http://localhost:8000/docs
+```
+
+### Seed demo data
+
+With the server running:
+
+```bash
 source .venv/bin/activate
 python scripts/seed.py
 ```
 
-## Tests
+---
+
+## Configuration
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | No | `sqlite:///./flyrank_billing.db` | SQLAlchemy database URL |
+| `APP_BASE_URL` | No | `http://localhost:8000` | Public URL for Stripe redirects |
+| `STRIPE_SECRET_KEY` | For Checkout | — | `sk_test_...` |
+| `STRIPE_WEBHOOK_SECRET` | For webhooks | — | `whsec_...` |
+| `STRIPE_PRICE_ID_PRO` | For Checkout | — | `price_...` for Pro plan |
+
+---
+
+## API Reference
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/tenants` | Create a tenant on the Free plan |
+| `GET` | `/tenants/{tenant_id}` | Read tenant details |
+| `POST` | `/generate` | Dummy billable endpoint; requires `Idempotency-Key` header |
+| `GET` | `/usage/{tenant_id}` | Monthly usage, limits, and cost rollup |
+| `POST` | `/checkout` | Create a Stripe Checkout session to upgrade to Pro |
+| `POST` | `/webhooks/stripe` | Stripe webhook endpoint |
+| `GET` | `/docs` | Swagger UI |
+
+### Example: record usage
+
+```bash
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: req-001" \
+  -d '{
+    "tenant_id": 1,
+    "api_calls": 1,
+    "input_tokens": 20000,
+    "cached_input_tokens": 40000,
+    "output_tokens": 20000,
+    "reasoning_tokens": 20000
+  }'
+```
+
+### Example: check usage
+
+```bash
+curl http://localhost:8000/usage/1
+```
+
+---
+
+## Running Tests
 
 ```bash
 source .venv/bin/activate
 pytest
 ```
 
-See [EVIDENCE.md](EVIDENCE.md) for probe transcripts and full test output.
+All 13 tests run in-process via `TestClient` (no real network sockets required).
 
-## Idempotency guarantee
+---
 
-The client sends a unique `Idempotency-Key` header with every `/generate` request. The service first checks `usage_events` for that key; if found, it returns the stored result without creating a new row. This guarantees exactly-once recording under network retries.
+## Acceptance Probes
 
-## Quota enforcement
+The capstone probes are exercised in `scripts/probes.py` and the test suite:
 
-Before recording usage, the service rolls up the current month's usage and checks `used + requested <= limit`.
+1. **Idempotency** — same `Idempotency-Key` produces exactly one `UsageEvent`.
+2. **Quota boundary** — call 1,000 succeeds; call 1,001 returns `429`.
+3. **Stripe upgrade** — webhook flips tenant Free → Pro; `/usage` reflects new limits.
+4. **Webhook security** — forged signature returns `400`; replayed event is ignored.
+5. **Token pricing** — cached input cheaper; reasoning tokens count as output; integer cents.
 
-- **Free plan exceeded** → `429 Too Many Requests`
-- **Lapsed / unpaid subscription** → `402 Payment Required`
+See [`EVIDENCE.md`](EVIDENCE.md) for pasted transcripts.
 
-## AI token pricing
+---
 
-Money is stored as integer cents. Token rates are cents per 1,000,000 tokens:
+## Project Structure
 
-| Category | Rate |
-|----------|------|
-| Input | $0.50 / 1M tokens |
-| Cached input | $0.25 / 1M tokens |
-| Output | $1.50 / 1M tokens |
-| Reasoning | billed as output |
-
-## Stripe webhooks
-
-The `/webhooks/stripe` endpoint:
-
-1. Verifies the Stripe signature (`400` if forged)
-2. Deduplicates by Stripe event ID (replays are ignored)
-3. Updates the tenant's plan and status
-
-Use the Stripe CLI locally:
-
-```bash
-stripe listen --forward-to localhost:8000/webhooks/stripe
-stripe trigger customer.subscription.updated
+```text
+.
+├── app/
+│   ├── config.py              # Pydantic settings
+│   ├── database.py            # SQLAlchemy engine & session
+│   ├── main.py                # FastAPI app + lifespan
+│   ├── models.py              # Database models
+│   ├── schemas.py             # Pydantic request/response models
+│   ├── jobs/                  # Background scheduler + usage alerts
+│   ├── routers/               # HTTP route handlers
+│   └── services/              # Business logic (meter, pricing, Stripe)
+├── scripts/
+│   ├── seed.py                # Demo data seed
+│   └── probes.py              # Acceptance probe runner
+├── tests/                     # pytest suite
+├── BUILDLOG.md                # AI assistance log
+├── DESIGN.md                  # Design document
+├── EVIDENCE.md                # Verification transcripts
+├── capstone.yaml              # Evaluator manifest
+├── requirements.txt           # Pinned dependencies
+└── README.md                  # This file
 ```
 
-## Limitations
+---
 
-- SQLite is used for portability; swap `DATABASE_URL` for PostgreSQL in production.
-- No proration, invoicing, or overage billing — these are stretch goals.
-- Token costs use integer division of cents-per-1M rates; sub-cent remainders are truncated.
-- The checkout success path is verified via mocked Stripe events and webhook tests; real browser checkout requires valid Stripe test keys.
+## Design Decisions
+
+- **Integer money**: all stored prices and computed costs use integer cents. Token rates are expressed as cents per 1,000,000 tokens to avoid floating-point arithmetic.
+- **Idempotency**: a unique constraint on `usage_events.idempotency_key` is the final guard against double-recording under concurrent retries.
+- **Webhook safety**: events are persisted to `processed_stripe_events` before handling so replays are always idempotent, even if the handler crashes mid-flight.
+- **Layered architecture**: routers validate and serialize; services contain business logic; models define the schema. Swapping SQLite for PostgreSQL requires only a connection-string change.
+
+---
+
+## Limitations & Roadmap
+
+- **SQLite** is used for portability; production should use PostgreSQL.
+- **Token cost precision**: sub-cent remainders from `cents-per-1M` rates are truncated. For higher precision, use millicents internally.
+- **No proration, invoicing, or overage billing** — these are deliberate stretch goals.
+- **In-process scheduler** is fine for demos; replace with Celery/RQ and a persistent broker in production.
+- **No authentication/authorization** in this scope; every endpoint trusts the `tenant_id` supplied by the caller.
+
+---
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).

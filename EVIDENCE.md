@@ -84,10 +84,10 @@ A request with a bad `Stripe-Signature` returns `400 Bad Request` and leaves ten
 ## DATA MODEL, TESTS & DOCUMENTATION
 
 - Database schema includes `tenants`, `plans`, `usage_events`, `subscriptions`, and `processed_stripe_events`.
-- All 9 tests pass:
+- All 13 tests pass:
 
 ```
-============================== 9 passed in 33.42s ==============================
+======================== 13 passed in 69.03s (0:01:09) =========================
 ```
 
 - Required files present: `README.md`, `capstone.yaml`, `BUILDLOG.md`, `EVIDENCE.md`, `.env.example`.
@@ -97,19 +97,41 @@ A request with a bad `Stripe-Signature` returns `400 Bad Request` and leaves ten
 ```
 $ source .venv/bin/activate && pytest
 ============================= test session starts ==============================
-platform linux -- Python 3.13.12, pytest-9.0.2, pluggy-0.0.0
+platform linux -- Python 3.13.12, pytest-9.0.2, pluggy-1.6.0 -- /home/sant0x/FlyRank/Capstone Project/.venv/bin/python
 rootdir: /home/sant0x/FlyRank/Capstone Project
-collected 9 items
+collected 13 items
 
-tests/test_metering.py::test_idempotency_creates_exactly_one_event PASSED [ 11%]
-tests/test_metering.py::test_quota_boundary_free_plan PASSED             [ 22%]
-tests/test_metering.py::test_payment_required_for_past_due PASSED        [ 33%]
-tests/test_pricing.py::test_cached_input_is_cheaper_than_input PASSED    [ 44%]
-tests/test_pricing.py::test_reasoning_tokens_count_as_output PASSED      [ 55%]
-tests/test_pricing.py::test_api_call_cost_is_linear PASSED              [ 66%]
-tests/test_pricing.py::test_mixed_token_cost PASSED                      [ 77%]
-tests/test_webhooks.py::test_forged_webhook_returns_400 PASSED           [ 88%]
+tests/test_docs.py::test_swagger_ui_reachable PASSED                     [  7%]
+tests/test_docs.py::test_openapi_schema_reachable PASSED                 [ 15%]
+tests/test_docs.py::test_full_crud_cycle PASSED                          [ 23%]
+tests/test_jobs.py::test_usage_alert_logs_near_quota PASSED              [ 30%]
+tests/test_metering.py::test_idempotency_creates_exactly_one_event PASSED [ 38%]
+tests/test_metering.py::test_quota_boundary_free_plan PASSED             [ 46%]
+tests/test_metering.py::test_payment_required_for_past_due PASSED        [ 53%]
+tests/test_pricing.py::test_cached_input_is_cheaper_than_input PASSED    [ 61%]
+tests/test_pricing.py::test_reasoning_tokens_count_as_output PASSED      [ 69%]
+tests/test_pricing.py::test_api_call_cost_is_linear PASSED               [ 76%]
+tests/test_pricing.py::test_mixed_token_cost PASSED                      [ 84%]
+tests/test_webhooks.py::test_forged_webhook_returns_400 PASSED           [ 92%]
 tests/test_webhooks.py::test_valid_webhook_processed_once_and_upgrades_plan PASSED [100%]
 
-============================== 9 passed in 33.42s ==============================
+======================== 13 passed in 69.03s (0:01:09) =========================
 ```
+
+## Background job
+
+A lightweight in-process scheduler runs `check_usage_alerts()` every 60 seconds and logs a warning when a tenant exceeds 80% of any quota.
+
+**Test**: `tests/test_jobs.py::test_usage_alert_logs_near_quota` PASSED
+
+## Swagger UI & CRUD
+
+**Test**: `tests/test_docs.py`
+
+```
+tests/test_docs.py::test_swagger_ui_reachable PASSED                     [ 33%]
+tests/test_docs.py::test_openapi_schema_reachable PASSED                 [ 66%]
+tests/test_docs.py::test_full_crud_cycle PASSED                          [100%]
+```
+
+`GET /docs` returns Swagger UI and the OpenAPI schema includes `/tenants`, `/generate`, `/usage/{tenant_id}`, `/checkout`, and `/webhooks/stripe`.
