@@ -66,6 +66,29 @@ def test_quota_boundary_free_plan(client: TestClient, free_tenant):
     assert "quota exceeded" in resp.json()["detail"].lower()
 
 
+def test_invalid_input_returns_422(client: TestClient, free_tenant):
+    tenant_id = free_tenant["id"]
+
+    cases = [
+        {"tenant_id": 0, "api_calls": 1},
+        {"tenant_id": tenant_id, "api_calls": -1},
+        {"tenant_id": tenant_id, "input_tokens": -10},
+        {"tenant_id": tenant_id, "cached_input_tokens": -10},
+        {"tenant_id": tenant_id, "output_tokens": -10},
+        {"tenant_id": tenant_id, "reasoning_tokens": -10},
+    ]
+
+    for payload in cases:
+        base = {"tenant_id": tenant_id, "api_calls": 1}
+        base.update(payload)
+        resp = client.post(
+            "/generate",
+            json=base,
+            headers={"Idempotency-Key": f"invalid-{id(payload)}"},
+        )
+        assert resp.status_code == 422, f"expected 422 for {payload}, got {resp.status_code}: {resp.text}"
+
+
 def test_payment_required_for_past_due(client: TestClient, free_tenant):
     from app.models import Tenant, TenantStatus
 
